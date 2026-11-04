@@ -19,12 +19,26 @@ diff --git a/dist/index.js b/dist/index.js
                  // Connect to stderr, as that is where the messages get sent
                  (_a = process.stdout) === null || _a === void 0 ? void 0 : _a.on('data', (chunk) => {
                      // Parse the data as a string and log it
-@@ -177,7 +177,7 @@
+@@ -177,16 +177,20 @@
                      '-p',
                      this.options.port.toString(),
                      ...this.options.postgresFlags,
 -                ], Object.assign(Object.assign({}, permissionIds), { env: { LC_MESSAGES: LC_MESSAGES_LOCALE } }));
 +                ], Object.assign(Object.assign({}, permissionIds), { env: Object.assign(Object.assign({}, globalThis.process.env), { LC_MESSAGES: LC_MESSAGES_LOCALE }) }));
++                const readyMessage = 'database system is ready to accept connections';
++                let readinessTail = '';
                  // Connect to stderr, as that is where the messages get sent
                  (_a = this.process.stderr) === null || _a === void 0 ? void 0 : _a.on('data', (chunk) => {
                      // Parse the data as a string and log it
+                     const message = chunk.toString('utf-8');
+                     this.options.onLog(message);
+                     // GUARD: Check for the right message to determine server start
+-                    if (message.includes('database system is ready to accept connections')) {
++                    const startupOutput = readinessTail + message;
++                    if (startupOutput.includes(readyMessage)) {
+                         resolve();
+                     }
++                    readinessTail = startupOutput.slice(-(readyMessage.length - 1));
+                 });
+                 // In case the process exits early, the promise is rejected.
+                 this.process.on('close', () => {
