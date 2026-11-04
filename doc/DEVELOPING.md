@@ -130,6 +130,12 @@ Current implementation status:
 - Node.js 24.11+
 - pnpm 9+
 
+`pnpm check:node-version` checks authored source. It excludes installed assets
+under `packages/paperclip-runner/provider-assets/` and `server/provider-assets/`.
+Tracked files inside these roots remain checked. The checker requires a Git
+checkout, including linked worktrees, to identify tracked files. Run
+`node --test scripts/check-node-version-policy.test.mjs` for its regressions.
+
 ## Dependency Lockfile Policy
 
 GitHub Actions owns `pnpm-lock.yaml`.

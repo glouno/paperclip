@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 import { isNode24ImageTag } from "./node-image-policy.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -8,6 +9,18 @@ const expectedEngine = ">=24.11.0";
 const expectedTypes = "^24.0.0";
 const failures = [];
 const skippedDirectories = new Set([".git", ".paperclip", "coverage", "data", "dist", "node_modules"]);
+const generatedRoots = ["packages/paperclip-runner/provider-assets", "server/provider-assets"];
+let trackedGeneratedFiles;
+try {
+  const gitIdentity = fs.statSync(path.join(repoRoot, ".git"));
+  if (!gitIdentity.isFile() && !gitIdentity.isDirectory()) throw new Error("missing Git checkout identity");
+  trackedGeneratedFiles = execFileSync("git", ["-C", repoRoot, "ls-files", "-z", "--", ...generatedRoots], {
+    encoding: "utf8", timeout: 10_000, maxBuffer: 1024 * 1024,
+  }).split("\0").filter(Boolean).map(file => path.join(repoRoot, file));
+} catch {
+  console.error("Node version policy check failed: Git source identity is unavailable; generated assets cannot be classified.");
+  process.exit(1);
+}
 
 function relative(filePath) {
   return path.relative(repoRoot, filePath) || ".";
@@ -17,8 +30,13 @@ function walk(directory, visit) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if (entry.isDirectory() && skippedDirectories.has(entry.name)) continue;
     const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory() && generatedRoots.some(root => entryPath === path.join(repoRoot, root))) continue;
     if (entry.isDirectory()) walk(entryPath, visit);
     else if (entry.isFile()) visit(entryPath);
+  }
+  if (directory === repoRoot) for (const filePath of trackedGeneratedFiles) {
+    if (!fs.lstatSync(filePath).isFile()) throw new Error(`${relative(filePath)}: tracked source must be an ordinary file`);
+    visit(filePath);
   }
 }
 
